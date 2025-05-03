@@ -259,7 +259,7 @@ const fetchTagQuestions = async () => {
 const fetchNextQuestion = async () => {
   try {
     const res = await noteApi.getNextQuestion(id.value, tagId.value)
-    nextQuestionId.value = res && res.id ? res.id : null
+    nextQuestionId.value = res ? res: null
   } catch (error) {
     console.error('获取下一题失败:', error)
     nextQuestionId.value = null
@@ -270,7 +270,7 @@ const fetchNextQuestion = async () => {
 const fetchPrevQuestion = async () => {
   try {
     const res = await noteApi.getPrevQuestion(id.value, tagId.value)
-    prevQuestionId.value = res && res.id ? res.id : null
+    prevQuestionId.value = res ? res: null
   } catch (error) {
     console.error('获取上一题失败:', error)
     prevQuestionId.value = null

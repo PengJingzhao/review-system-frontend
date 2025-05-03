@@ -15,7 +15,7 @@
       :class="{ active: currentPath === '/home/questionbank' }" 
       @click="goToPage('/home/questionbank')"
     >题库</div>
-    <div 
+    <!-- <div 
       class="category-item" 
       :class="{ active: currentPath === '/food' }" 
       @click="goToPage('/food')"
@@ -59,7 +59,7 @@
       class="category-item" 
       :class="{ active: currentPath === '/fitness' }" 
       @click="goToPage('/fitness')"
-    >健身</div>
+    >健身</div> -->
   </div>
 </template>
 

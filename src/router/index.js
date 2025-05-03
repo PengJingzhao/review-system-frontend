@@ -17,7 +17,7 @@ const NotFound = () => import('../views/NotFound.vue')
 const routes = [
   {
     path: '/',
-    redirect: '/home/recommend'
+    redirect: '/home/questionbank'
   },
   {
     path: '/login',

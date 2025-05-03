@@ -41,22 +41,22 @@
         ></el-rate>
       </el-form-item>
 
-      <el-form-item label="标签" prop="tags">
+      <el-form-item label="标签" prop="tagIds">
         <el-select
-          v-model="questionForm.tags"
+          v-model="questionForm.tagIds"
           multiple
           filterable
-          allow-create
-          default-first-option
-          placeholder="请选择或创建标签"
+          placeholder="请选择标签"
+          v-loading="tagsLoading"
         >
           <el-option
-            v-for="tag in commonTags"
-            :key="tag"
-            :label="tag"
-            :value="tag"
+            v-for="tag in availableTags"
+            :key="tag.id"
+            :label="tag.tag"
+            :value="tag.id"
           ></el-option>
         </el-select>
+        <div class="tips">注意：只能选择已有标签，不可创建新标签</div>
       </el-form-item>
 
       <el-form-item>
@@ -68,7 +68,7 @@
 </template>
 
 <script setup>
-import { ref, reactive } from 'vue'
+import { ref, reactive, onMounted } from 'vue'
 import { ElMessage } from 'element-plus'
 import noteApi from '@/api/note'
 import {MdEditor} from 'md-editor-v3'
@@ -79,6 +79,10 @@ const emit = defineEmits(['success', 'cancel'])
 // 表单引用
 const formRef = ref(null)
 
+// 可用标签列表
+const availableTags = ref([])
+const tagsLoading = ref(false)
+
 // 表单数据
 const questionForm = reactive({
   title: '',
@@ -86,7 +90,7 @@ const questionForm = reactive({
   source: '',
   appearRate: 0.5,
   difficulty: 3,
-  tags: []
+  tagIds: [] // 改为存储标签ID
 })
 
 // 表单验证规则
@@ -95,14 +99,8 @@ const rules = {
   answer: [{ required: true, message: '请输入答案内容', trigger: 'blur' }],
   source: [{ required: true, message: '请输入题目来源', trigger: 'blur' }],
   difficulty: [{ required: true, message: '请选择难度等级', trigger: 'change' }],
-  tags: [{ required: true, message: '请至少添加一个标签', trigger: 'change' }]
+  tagIds: [{ required: true, message: '请至少选择一个标签', trigger: 'change' }]
 }
-
-// 常用标签
-const commonTags = [
-  '前端', '后端', '微服务', '架构', '设计', 'JavaScript', 'Vue', 'React', 'Node.js',
-  'Java', 'Spring', 'Python', 'Go', '数据库', 'MySQL', 'MongoDB', 'Redis', '算法', '网络'
-]
 
 // 难度等级颜色
 const difficultyColors = ['#99A9BF', '#F7BA2A', '#FF9900', '#FA6400', '#FF0000']
@@ -121,6 +119,21 @@ const toolbarsExclude = [
   'fullscreen'
 ]
 
+// 获取所有可用标签
+const fetchTags = async () => {
+  tagsLoading.value = true
+  try {
+    const res = await noteApi.getQuestionTags()
+    availableTags.value = res || []
+  } catch (error) {
+    console.error('获取标签列表失败:', error)
+    ElMessage.error('获取标签列表失败')
+    availableTags.value = []
+  } finally {
+    tagsLoading.value = false
+  }
+}
+
 // 提交表单
 const submitForm = async () => {
   if (!formRef.value) return
@@ -128,8 +141,15 @@ const submitForm = async () => {
   try {
     await formRef.value.validate()
     
+    // 准备提交数据
+    const data = {
+      ...questionForm,
+      // 确保提交的是标签ID列表
+      tagIds: questionForm.tagIds
+    }
+    
     // 调用API创建题目
-    const result = await noteApi.createQuestion(questionForm)
+    const result = await noteApi.createQuestion(data)
     
     ElMessage.success('题目发布成功')
     emit('success', result)
@@ -146,6 +166,11 @@ const resetForm = () => {
     formRef.value.resetFields()
   }
 }
+
+// 组件挂载时获取标签列表
+onMounted(() => {
+  fetchTags()
+})
 </script>
 
 <style scoped>
@@ -159,5 +184,11 @@ const resetForm = () => {
 :deep(.md-editor) {
   border: 1px solid #dcdfe6;
   border-radius: 4px;
+}
+
+.tips {
+  font-size: 12px;
+  color: #909399;
+  margin-top: 4px;
 }
 </style> 
