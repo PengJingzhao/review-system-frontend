@@ -1,6 +1,34 @@
 <template>
   <div class="question-detail" v-loading="loading">
     <div v-if="!loading && question" class="question-container">
+      <!-- 导航按钮 -->
+      <div class="navigation-buttons">
+        <el-button 
+          type="primary" 
+          plain 
+          :disabled="!prevQuestionId" 
+          @click="navigateToQuestion(prevQuestionId)"
+        >
+          <el-icon><ArrowLeft /></el-icon> 上一题
+        </el-button>
+        
+        <el-button 
+          type="primary" 
+          @click="backToList"
+        >
+          返回列表
+        </el-button>
+        
+        <el-button 
+          type="primary" 
+          plain 
+          :disabled="!nextQuestionId" 
+          @click="navigateToQuestion(nextQuestionId)"
+        >
+          下一题 <el-icon><ArrowRight /></el-icon>
+        </el-button>
+      </div>
+
       <div class="question-header">
         <h2 class="title">{{ question.title }}</h2>
         <div class="meta">
@@ -48,6 +76,25 @@
         </div>
         <div v-else class="answer-hidden">
           <el-empty description="答案已隐藏，点击上方按钮查看" :image-size="80"></el-empty>
+        </div>
+      </div>
+
+      <!-- 题目导航 -->
+      <div class="question-navigation" v-if="questions.length > 0">
+        <div class="section-title">题目导航</div>
+        <div class="question-list">
+          <el-scrollbar height="200px">
+            <div 
+              v-for="(q, index) in questions" 
+              :key="q.id" 
+              class="question-nav-item" 
+              :class="{ active: q.id === parseInt(id) }"
+              @click="navigateToQuestion(q.id)"
+            >
+              <span class="question-index">{{ index + 1 }}</span>
+              <span class="question-title-nav">{{ q.title }}</span>
+            </div>
+          </el-scrollbar>
         </div>
       </div>
 
@@ -107,11 +154,11 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import noteApi from '@/api/note'
 import { ElMessage } from 'element-plus'
-import { View, Star, Coin, Comment } from '@element-plus/icons-vue'
+import { View, Star, Coin, Comment, ArrowRight, ArrowLeft } from '@element-plus/icons-vue'
 import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
 
@@ -122,9 +169,33 @@ const question = ref(null)
 const commentContent = ref('')
 const showAnswer = ref(false)
 const previewTheme = 'github'
+const id = ref(route.params.id)
+const tagId = ref(route.query.tagId)
+const nextQuestionId = ref(null)
+const prevQuestionId = ref(null)
+const questions = ref([])
 
 // 难度等级颜色
 const difficultyColors = ['#99A9BF', '#F7BA2A', '#FF9900', '#FA6400', '#FF0000']
+
+// 监听路由变化
+watch(
+  () => route.params.id,
+  (newId) => {
+    id.value = newId
+    fetchQuestionDetail()
+  }
+)
+
+watch(
+  () => route.query.tagId,
+  (newTagId) => {
+    tagId.value = newTagId
+    if (newTagId) {
+      fetchTagQuestions()
+    }
+  }
+)
 
 // 格式化频率显示
 const formatRate = (val) => {
@@ -151,16 +222,77 @@ const toggleAnswer = () => {
 // 获取题目详情
 const fetchQuestionDetail = async () => {
   loading.value = true
-  const questionId = route.params.id
   
   try {
-    const data = await noteApi.getQuestionDetail(questionId)
+    const data = await noteApi.getQuestionDetail(id.value)
     question.value = data
+    
+    // 获取上一题和下一题的ID
+    if (tagId.value) {
+      fetchNextQuestion()
+      fetchPrevQuestion()
+    }
   } catch (error) {
     console.error('获取题目详情失败:', error)
     ElMessage.error('获取题目详情失败')
   } finally {
     loading.value = false
+  }
+}
+
+// 获取该标签下所有题目列表（用于导航）
+const fetchTagQuestions = async () => {
+  if (!tagId.value) return
+  
+  try {
+    // 获取标签下所有题目，设置较大的size以获取全部
+    const res = await noteApi.getQuestionsByTag(tagId.value, 1, 100)
+    if (res && res.records) {
+      questions.value = res.records
+    }
+  } catch (error) {
+    console.error('获取标签题目列表失败:', error)
+  }
+}
+
+// 获取下一题
+const fetchNextQuestion = async () => {
+  try {
+    const res = await noteApi.getNextQuestion(id.value, tagId.value)
+    nextQuestionId.value = res && res.id ? res.id : null
+  } catch (error) {
+    console.error('获取下一题失败:', error)
+    nextQuestionId.value = null
+  }
+}
+
+// 获取上一题
+const fetchPrevQuestion = async () => {
+  try {
+    const res = await noteApi.getPrevQuestion(id.value, tagId.value)
+    prevQuestionId.value = res && res.id ? res.id : null
+  } catch (error) {
+    console.error('获取上一题失败:', error)
+    prevQuestionId.value = null
+  }
+}
+
+// 导航到指定题目
+const navigateToQuestion = (questionId) => {
+  if (!questionId) return
+  
+  router.push({
+    path: `/question/${questionId}`,
+    query: { tagId: tagId.value }
+  })
+}
+
+// 返回题目列表
+const backToList = () => {
+  if (tagId.value) {
+    router.push('/home/questionbank')
+  } else {
+    router.go(-1)
   }
 }
 
@@ -186,6 +318,9 @@ const submitComment = async () => {
 // 页面加载时获取数据
 onMounted(() => {
   fetchQuestionDetail()
+  if (tagId.value) {
+    fetchTagQuestions()
+  }
 })
 </script>
 
@@ -201,6 +336,13 @@ onMounted(() => {
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
+}
+
+.navigation-buttons {
+  display: flex;
+  justify-content: space-between;
+  padding: 16px;
+  border-bottom: 1px solid #ebeef5;
 }
 
 .question-header {
@@ -256,45 +398,82 @@ onMounted(() => {
 }
 
 .toggle-btn {
-  font-size: 12px;
-  padding: 4px 10px;
+  margin-left: auto;
 }
 
 .answer {
-  background-color: #f8f8f8;
-  padding: 15px;
-  border-radius: 4px;
-  border-left: 4px solid #409EFF;
-}
-
-.answer :deep(.md-preview-wrapper) {
-  padding: 0 !important;
-  background-color: transparent !important;
+  margin-top: 16px;
 }
 
 .answer-hidden {
-  min-height: 100px;
+  padding: 40px 0;
+  text-align: center;
+}
+
+.question-navigation {
+  padding: 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.question-list {
+  background-color: #f5f7fa;
+  border-radius: 4px;
+}
+
+.question-nav-item {
+  padding: 10px 16px;
+  cursor: pointer;
   display: flex;
   align-items: center;
-  justify-content: center;
-  background-color: #f8f8f8;
-  border-radius: 4px;
-  padding: 15px;
+  transition: background-color 0.3s;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.question-nav-item:hover {
+  background-color: #e6f1fc;
+}
+
+.question-nav-item.active {
+  background-color: #ecf5ff;
+  color: #409EFF;
+  font-weight: bold;
+}
+
+.question-index {
+  display: inline-block;
+  width: 24px;
+  height: 24px;
+  line-height: 24px;
+  text-align: center;
+  border-radius: 50%;
+  background-color: #909399;
+  color: white;
+  margin-right: 10px;
+  font-size: 12px;
+}
+
+.question-nav-item.active .question-index {
+  background-color: #409EFF;
+}
+
+.question-title-nav {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .stats {
   display: flex;
-  padding: 12px 20px;
+  padding: 16px 20px;
   border-bottom: 1px solid #ebeef5;
-  gap: 20px;
+  gap: 24px;
 }
 
 .stat-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  color: #606266;
-  font-size: 14px;
+  gap: 6px;
+  color: #909399;
 }
 
 .comments {
@@ -302,16 +481,12 @@ onMounted(() => {
 }
 
 .comment-list {
-  margin-bottom: 24px;
+  margin-bottom: 20px;
 }
 
 .comment-item {
   padding: 12px 0;
   border-bottom: 1px solid #ebeef5;
-}
-
-.comment-item:last-child {
-  border-bottom: none;
 }
 
 .comment-header {
@@ -323,9 +498,9 @@ onMounted(() => {
 }
 
 .comment-content {
-  font-size: 15px;
-  line-height: 1.6;
+  font-size: 14px;
   color: #303133;
+  line-height: 1.6;
 }
 
 .add-comment {

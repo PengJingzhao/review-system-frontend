@@ -5,118 +5,149 @@
       <el-button type="primary" @click="showCreateDialog = true">发布题目</el-button>
     </div>
 
-    <!-- 筛选表单 -->
-    <div class="filter-form">
-      <el-form :model="queryParams" inline>
-        <el-form-item label="关键词">
-          <el-input v-model="queryParams.keyword" placeholder="搜索题目标题和答案" clearable></el-input>
-        </el-form-item>
-        
-        <el-form-item label="难度等级">
-          <el-select v-model="queryParams.difficulty" placeholder="选择难度" clearable>
-            <el-option label="入门级" :value="1"></el-option>
-            <el-option label="简单" :value="2"></el-option>
-            <el-option label="中等" :value="3"></el-option>
-            <el-option label="困难" :value="4"></el-option>
-            <el-option label="专家级" :value="5"></el-option>
-          </el-select>
-        </el-form-item>
-
-        <el-form-item label="标签">
-          <el-select 
-            v-model="queryParams.tags" 
-            multiple 
-            placeholder="选择标签"
-            filterable
-            collapse-tags
-            clearable
-          >
-            <el-option
-              v-for="tag in commonTags"
-              :key="tag"
-              :label="tag"
-              :value="tag"
-            ></el-option>
-          </el-select>
-        </el-form-item>
-
-        <el-form-item>
-          <el-button type="primary" @click="handleQuery">查询</el-button>
-          <el-button @click="resetQuery">重置</el-button>
-        </el-form-item>
-      </el-form>
-    </div>
-
-    <!-- 题目列表 -->
-    <div v-if="loading">
-      <el-skeleton :rows="3" animated />
-    </div>
-    <div v-else-if="questions.length === 0">
-      <el-empty description="暂无符合条件的题目" />
-    </div>
-    <div v-else>
-      <div class="question-list">
-        <div v-for="question in questions" :key="question.id" class="question-item">
-          <div class="question-title">
-            <h3>
-              <router-link :to="`/question/${question.id}`" class="title-link">
-                {{ question.title }}
-              </router-link>
-            </h3>
-            <div class="question-meta">
-              <el-tag size="small" type="success" v-for="tag in question.tags" :key="tag" class="tag">{{ tag }}</el-tag>
-              <el-rate 
-                v-model="question.difficulty" 
-                disabled 
-                :colors="difficultyColors"
-                class="difficulty"
-              ></el-rate>
-              <span class="appear-rate">出现频率: {{ formatRate(question.appearRate) }}</span>
-              <span class="source">来源: {{ question.source }}</span>
-            </div>
+    <!-- 标签列表视图 -->
+    <div v-if="!selectedTag" class="tags-container">
+      <el-card>
+        <template #header>
+          <div class="card-header">
+            <span>标签分类</span>
+            <el-input
+              v-model="tagSearch"
+              placeholder="搜索标签"
+              clearable
+              prefix-icon="Search"
+              style="width: 200px"
+            ></el-input>
           </div>
-          <div class="question-stats">
-            <span class="stat-item">
-              <el-tooltip content="浏览次数" placement="top">
-                <el-icon><View /></el-icon>
-              </el-tooltip>
-              <span>{{ question.viewCount }}</span>
-            </span>
-            <span class="stat-item">
-              <el-tooltip content="收藏数" placement="top">
-                <el-icon><Star /></el-icon>
-              </el-tooltip>
-              <span>{{ question.favoriteCount }}</span>
-            </span>
-            <span class="stat-item">
-              <el-tooltip content="点赞数" placement="top">
-                <el-icon><Coin /></el-icon>
-              </el-tooltip>
-              <span>{{ question.likeCount }}</span>
-            </span>
-            <span class="stat-item">
-              <el-tooltip content="评论数" placement="top">
-                <el-icon><Comment /></el-icon>
-              </el-tooltip>
-              <span>{{ question.commentCount }}</span>
-            </span>
-          </div>
+        </template>
+        <div v-if="tagsLoading">
+          <el-skeleton :rows="3" animated />
         </div>
+        <div v-else-if="filteredTags.length === 0">
+          <el-empty description="暂无标签" />
+        </div>
+        <div v-else class="tag-list">
+          <el-card 
+            v-for="tag in filteredTags" 
+            :key="tag.id" 
+            shadow="hover" 
+            class="tag-card"
+            @click="selectTag(tag)"
+          >
+            <div class="tag-info">
+              <h3>{{ tag.tag }}</h3>
+              <p class="tag-count" v-if="tag.count">共 {{ tag.count }} 题</p>
+            </div>
+          </el-card>
+        </div>
+      </el-card>
+    </div>
+
+    <!-- 题目列表视图 -->
+    <div v-else>
+      <div class="category-header">
+        <el-page-header @back="backToTags" title="题目列表">
+          <template #content>
+            <span class="selected-tag">{{ selectedTag.tag }}</span>
+          </template>
+        </el-page-header>
       </div>
 
-      <!-- 分页组件 -->
-      <div class="pagination-container">
-        <el-pagination
-          background
-          layout="total, sizes, prev, pager, next, jumper"
-          :total="total"
-          :page-size="queryParams.size"
-          :page-sizes="[10, 20, 50, 100]"
-          :current-page="queryParams.page"
-          @size-change="handleSizeChange"
-          @current-change="handleCurrentChange"
-        >
-        </el-pagination>
+      <!-- 筛选表单 -->
+      <div class="filter-form">
+        <el-form :model="queryParams" inline>
+          <el-form-item label="关键词">
+            <el-input v-model="queryParams.keyword" placeholder="搜索题目标题和答案" clearable></el-input>
+          </el-form-item>
+          
+          <el-form-item label="难度等级">
+            <el-select v-model="queryParams.difficulty" placeholder="选择难度" clearable>
+              <el-option label="入门级" :value="1"></el-option>
+              <el-option label="简单" :value="2"></el-option>
+              <el-option label="中等" :value="3"></el-option>
+              <el-option label="困难" :value="4"></el-option>
+              <el-option label="专家级" :value="5"></el-option>
+            </el-select>
+          </el-form-item>
+
+          <el-form-item>
+            <el-button type="primary" @click="handleQuery">查询</el-button>
+            <el-button @click="resetQuery">重置</el-button>
+          </el-form-item>
+        </el-form>
+      </div>
+
+      <!-- 题目列表 -->
+      <div v-if="loading">
+        <el-skeleton :rows="3" animated />
+      </div>
+      <div v-else-if="questions.length === 0">
+        <el-empty description="暂无符合条件的题目" />
+      </div>
+      <div v-else>
+        <div class="question-list">
+          <div v-for="question in questions" :key="question.id" class="question-item">
+            <div class="question-title">
+              <h3>
+                <router-link :to="`/question/${question.id}?tagId=${selectedTag.id}`" class="title-link">
+                  {{ question.title }}
+                </router-link>
+              </h3>
+              <div class="question-meta">
+                <el-tag size="small" type="success" v-for="tag in question.tags" :key="tag" class="tag">{{ tag }}</el-tag>
+                <el-rate 
+                  v-model="question.difficulty" 
+                  disabled 
+                  :colors="difficultyColors"
+                  class="difficulty"
+                ></el-rate>
+                <span class="appear-rate">出现频率: {{ formatRate(question.appearRate) }}</span>
+                <span class="source">来源: {{ question.source }}</span>
+              </div>
+            </div>
+            <div class="question-stats">
+              <span class="stat-item">
+                <el-tooltip content="浏览次数" placement="top">
+                  <el-icon><View /></el-icon>
+                </el-tooltip>
+                <span>{{ question.viewCount }}</span>
+              </span>
+              <span class="stat-item">
+                <el-tooltip content="收藏数" placement="top">
+                  <el-icon><Star /></el-icon>
+                </el-tooltip>
+                <span>{{ question.favoriteCount }}</span>
+              </span>
+              <span class="stat-item">
+                <el-tooltip content="点赞数" placement="top">
+                  <el-icon><Coin /></el-icon>
+                </el-tooltip>
+                <span>{{ question.likeCount }}</span>
+              </span>
+              <span class="stat-item">
+                <el-tooltip content="评论数" placement="top">
+                  <el-icon><Comment /></el-icon>
+                </el-tooltip>
+                <span>{{ question.commentCount }}</span>
+              </span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 分页组件 -->
+        <div class="pagination-container">
+          <el-pagination
+            background
+            layout="total, sizes, prev, pager, next, jumper"
+            :total="total"
+            :page-size="queryParams.size"
+            :page-sizes="[10, 20, 50, 100]"
+            :current-page="queryParams.page"
+            @size-change="handleSizeChange"
+            @current-change="handleCurrentChange"
+          >
+          </el-pagination>
+        </div>
       </div>
     </div>
 
@@ -133,16 +164,22 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted} from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import NoteList from '@/components/NoteList.vue'
 import QuestionForm from '@/components/QuestionForm.vue'
 import noteApi from '@/api/note'
 import { ElMessage } from 'element-plus'
-import { View, Star, Coin, Comment } from '@element-plus/icons-vue'
+import { View, Star, Coin, Comment, Search } from '@element-plus/icons-vue'
+
+// 标签数据
+const tags = ref([])
+const tagsLoading = ref(true)
+const tagSearch = ref('')
+const selectedTag = ref(null)
 
 // 题库数据
 const questions = ref([])
-const loading = ref(true)
+const loading = ref(false)
 const showCreateDialog = ref(false)
 const total = ref(0)
 
@@ -152,14 +189,16 @@ const queryParams = reactive({
   size: 10,
   difficulty: undefined,
   keyword: '',
-  tags: []
+  tagId: null
 })
 
-// 常用标签
-const commonTags = [
-  '前端', '后端', '微服务', '架构', '设计', 'JavaScript', 'Vue', 'React', 'Node.js',
-  'Java', 'Spring', 'Python', 'Go', '数据库', 'MySQL', 'MongoDB', 'Redis', '算法', '网络', 'Http'
-]
+// 过滤后的标签列表
+const filteredTags = computed(() => {
+  if (!tagSearch.value) return tags.value
+  return tags.value.filter(tag => 
+    tag.tag.toLowerCase().includes(tagSearch.value.toLowerCase())
+  )
+})
 
 // 难度等级颜色
 const difficultyColors = ['#99A9BF', '#F7BA2A', '#FF9900', '#FA6400', '#FF0000']
@@ -169,12 +208,42 @@ const formatRate = (val) => {
   return `${Math.round(val * 100)}%`
 }
 
-// 获取题库列表 - 改为使用分页查询API
+// 获取所有标签
+const fetchTags = async () => {
+  tagsLoading.value = true
+  try {
+    const res = await noteApi.getQuestionTags()
+    tags.value = res || []
+  } catch (error) {
+    console.error('获取标签列表失败:', error)
+    ElMessage.error('获取标签列表失败')
+    tags.value = []
+  } finally {
+    tagsLoading.value = false
+  }
+}
+
+// 选择标签
+const selectTag = (tag) => {
+  selectedTag.value = tag
+  queryParams.tagId = tag.id
+  queryParams.page = 1
+  fetchQuestionList()
+}
+
+// 返回标签列表
+const backToTags = () => {
+  selectedTag.value = null
+  queryParams.tagId = null
+}
+
+// 获取题目列表
 const fetchQuestionList = async () => {
+  if (!selectedTag.value) return
+  
   loading.value = true
   try {
-    // 使用分页查询API
-    const res = await noteApi.pageQuestionList(queryParams)
+    const res = await noteApi.getQuestionsByTag(selectedTag.value.id, queryParams.page, queryParams.size)
     if (res && res.records) {
       questions.value = res.records
       total.value = res.total
@@ -183,8 +252,8 @@ const fetchQuestionList = async () => {
       total.value = 0
     }
   } catch (error) {
-    console.error('获取题库内容失败:', error)
-    ElMessage.error('获取题库内容失败')
+    console.error('获取题目列表失败:', error)
+    ElMessage.error('获取题目列表失败')
     questions.value = []
     total.value = 0
   } finally {
@@ -203,7 +272,6 @@ const resetQuery = () => {
   queryParams.page = 1
   queryParams.keyword = ''
   queryParams.difficulty = undefined
-  queryParams.tags = []
   fetchQuestionList()
 }
 
@@ -229,14 +297,13 @@ const handleCloseDialog = () => {
 const handleCreateSuccess = (newQuestion) => {
   ElMessage.success('题目发布成功')
   showCreateDialog.value = false
-  // 重新获取题库列表或者直接添加到现有列表
-  queryParams.page = 1 // 返回第一页
-  fetchQuestionList()
+  // 重新获取标签列表
+  fetchTags()
 }
 
-// 页面加载时获取数据
+// 页面加载时获取标签数据
 onMounted(() => {
-  fetchQuestionList()
+  fetchTags()
 })
 </script>
 
@@ -253,17 +320,57 @@ onMounted(() => {
   margin-bottom: 20px;
 }
 
-.question-header h2 {
-  margin: 0;
-  font-size: 20px;
-  color: #333;
+.tags-container {
+  margin-bottom: 20px;
+}
+
+.card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.tag-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 16px;
+  margin-top: 16px;
+}
+
+.tag-card {
+  cursor: pointer;
+  transition: transform 0.3s;
+}
+
+.tag-card:hover {
+  transform: translateY(-5px);
+}
+
+.tag-info {
+  text-align: center;
+  padding: 10px;
+}
+
+.tag-count {
+  margin-top: 5px;
+  color: #909399;
+  font-size: 14px;
+}
+
+.category-header {
+  margin-bottom: 20px;
+}
+
+.selected-tag {
+  font-weight: bold;
+  font-size: 16px;
 }
 
 .filter-form {
-  background: #f5f7fa;
+  margin-bottom: 20px;
+  background-color: #f5f7fa;
   padding: 15px;
   border-radius: 4px;
-  margin-bottom: 20px;
 }
 
 .question-list {
@@ -271,27 +378,22 @@ onMounted(() => {
 }
 
 .question-item {
-  background: #fff;
-  border-radius: 8px;
   padding: 16px;
-  margin-bottom: 16px;
+  background-color: #fff;
+  border-radius: 4px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  margin-bottom: 16px;
+  display: flex;
+  justify-content: space-between;
 }
 
 .question-title {
-  margin-bottom: 12px;
-}
-
-.question-title h3 {
-  margin: 0 0 8px 0;
-  font-size: 18px;
-  color: #303133;
+  flex: 1;
 }
 
 .title-link {
   color: #303133;
   text-decoration: none;
-  transition: color 0.3s;
 }
 
 .title-link:hover {
@@ -300,12 +402,10 @@ onMounted(() => {
 
 .question-meta {
   display: flex;
-  align-items: center;
   flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 10px;
-  font-size: 13px;
-  color: #606266;
+  align-items: center;
+  margin-top: 8px;
+  gap: 10px;
 }
 
 .tag {
@@ -317,37 +417,26 @@ onMounted(() => {
 }
 
 .appear-rate, .source {
-  margin-left: 10px;
-  font-size: 13px;
+  font-size: 14px;
   color: #606266;
 }
 
 .question-stats {
   display: flex;
+  align-items: center;
   gap: 16px;
-  font-size: 13px;
-  color: #909399;
-  margin-top: 10px;
 }
 
 .stat-item {
   display: flex;
   align-items: center;
-  gap: 4px;
-  cursor: pointer;
-  transition: color 0.3s;
-}
-
-.stat-item:hover {
-  color: #409EFF;
-}
-
-.stat-item .el-icon {
-  font-size: 16px;
+  gap: 5px;
+  color: #909399;
 }
 
 .pagination-container {
-  text-align: center;
-  margin-top: 30px;
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
 }
 </style> 

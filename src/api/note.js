@@ -210,6 +210,47 @@ const noteApi = {
       throw error
     }
   },
+
+  // 获取所有标签列表
+  getQuestionTags: async () => {
+    try {
+      return await request.get('/question/getTags')
+    } catch (error) {
+      throw error
+    }
+  },
+
+  // 获取特定标签下的题目列表
+  getQuestionsByTag: async (tagId, page = 1, size = 10) => {
+    try {
+      return await request.get(`/question/getByTag/${tagId}`, {
+        params: { page, size }
+      })
+    } catch (error) {
+      throw error
+    }
+  },
+
+  // 获取上一题/下一题
+  getNextQuestion: async (currentId, tagId) => {
+    try {
+      return await request.get('/question/getNext', {
+        params: { currentId, tagId }
+      })
+    } catch (error) {
+      throw error
+    }
+  },
+
+  getPrevQuestion: async (currentId, tagId) => {
+    try {
+      return await request.get('/question/getPrev', {
+        params: { currentId, tagId }
+      })
+    } catch (error) {
+      throw error
+    }
+  }
 }
 
 export default noteApi 
