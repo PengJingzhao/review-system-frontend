@@ -17,6 +17,37 @@
         />
       </el-form-item>
 
+      <el-form-item label="讲解视频">
+        <el-upload
+          class="video-uploader"
+          action="http://10.21.32.95:30618/api/file/uploadFile"
+          :headers="uploadHeaders"
+          :before-upload="beforeVideoUpload"
+          :on-success="handleVideoSuccess"
+          :on-error="handleVideoError"
+          :on-progress="handleVideoProgress"
+          :limit="1"
+          :file-list="videoFileList"
+          accept="video/*"
+        >
+          <el-button type="primary" :loading="videoUploading">
+            <el-icon><Upload /></el-icon>
+            {{ videoUrl ? '更换视频' : '上传讲解视频' }}
+          </el-button>
+          <template #tip>
+            <div class="tips">支持mp4、webm等主流视频格式，建议大小不超过100MB</div>
+          </template>
+        </el-upload>
+        
+        <!-- 视频预览 -->
+        <div v-if="videoUrl" class="video-preview">
+          <video :src="videoUrl" controls class="preview-video"></video>
+          <el-button type="danger" size="small" @click="removeVideo">
+            <el-icon><Delete /></el-icon> 删除视频
+          </el-button>
+        </div>
+      </el-form-item>
+
       <el-form-item label="来源" prop="source">
         <el-input v-model="questionForm.source" placeholder="请输入题目来源，如：书籍、面试公司等"></el-input>
       </el-form-item>
@@ -68,11 +99,12 @@
 </template>
 
 <script setup>
-import { ref, reactive, onMounted } from 'vue'
+import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import noteApi from '@/api/note'
 import {MdEditor} from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
+import { Upload, Delete } from '@element-plus/icons-vue'
 
 const emit = defineEmits(['success', 'cancel'])
 
@@ -83,6 +115,18 @@ const formRef = ref(null)
 const availableTags = ref([])
 const tagsLoading = ref(false)
 
+// 视频上传相关
+const videoUrl = ref('')
+const videoUploading = ref(false)
+const videoFileList = ref([])
+
+// 上传请求头，用于携带token
+const uploadHeaders = computed(() => {
+  return {
+    Authorization: localStorage.getItem('token') || ''
+  }
+})
+
 // 表单数据
 const questionForm = reactive({
   title: '',
@@ -90,7 +134,8 @@ const questionForm = reactive({
   source: '',
   appearRate: 0.5,
   difficulty: 3,
-  tagIds: [] // 改为存储标签ID
+  tagIds: [], // 存储标签ID
+  videoUrl: '' // 存储视频URL
 })
 
 // 表单验证规则
@@ -119,6 +164,57 @@ const toolbarsExclude = [
   'fullscreen'
 ]
 
+// 视频上传前验证
+const beforeVideoUpload = (file) => {
+  const isVideo = file.type.startsWith('video/')
+  const isLt100M = file.size / 1024 / 1024 < 100
+
+  if (!isVideo) {
+    ElMessage.error('只能上传视频文件！')
+    return false
+  }
+  
+  if (!isLt100M) {
+    ElMessage.error('视频大小不能超过100MB！')
+    return false
+  }
+  
+  videoUploading.value = true
+  return true
+}
+
+// 视频上传成功处理
+const handleVideoSuccess = (response, file) => {
+  videoUploading.value = false
+  
+  if (response) {
+    videoUrl.value = response
+    questionForm.videoUrl = response
+    ElMessage.success('视频上传成功')
+  } else {
+    ElMessage.error('上传失败，未能获取视频URL')
+  }
+}
+
+// 视频上传失败处理
+const handleVideoError = () => {
+  videoUploading.value = false
+  ElMessage.error('视频上传失败，请重试')
+}
+
+// 视频上传进度处理
+const handleVideoProgress = () => {
+  videoUploading.value = true
+}
+
+// 删除视频
+const removeVideo = () => {
+  videoUrl.value = ''
+  questionForm.videoUrl = ''
+  videoFileList.value = []
+  ElMessage.success('视频已删除')
+}
+
 // 获取所有可用标签
 const fetchTags = async () => {
   tagsLoading.value = true
@@ -141,11 +237,17 @@ const submitForm = async () => {
   try {
     await formRef.value.validate()
     
+    if (videoUploading.value) {
+      ElMessage.warning('视频正在上传中，请等待上传完成')
+      return
+    }
+    
     // 准备提交数据
     const data = {
       ...questionForm,
-      // 确保提交的是标签ID列表
-      tagIds: questionForm.tagIds
+      // 确保提交的是标签ID列表和视频URL
+      tagIds: questionForm.tagIds,
+      videoUrl: questionForm.videoUrl
     }
     
     // 调用API创建题目
@@ -165,6 +267,9 @@ const resetForm = () => {
   if (formRef.value) {
     formRef.value.resetFields()
   }
+  videoUrl.value = ''
+  questionForm.videoUrl = ''
+  videoFileList.value = []
 }
 
 // 组件挂载时获取标签列表
@@ -190,5 +295,24 @@ onMounted(() => {
   font-size: 12px;
   color: #909399;
   margin-top: 4px;
+}
+
+.video-uploader {
+  margin-bottom: 15px;
+}
+
+.video-preview {
+  margin-top: 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.preview-video {
+  max-width: 100%;
+  max-height: 300px;
+  border-radius: 4px;
+  object-fit: contain;
+  background-color: #f5f7fa;
 }
 </style> 
