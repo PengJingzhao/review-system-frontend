@@ -59,6 +59,17 @@
         </div>
       </div>
 
+      <!-- 讲解视频 -->
+      <div v-if="question.video" class="video-section">
+        <div class="section-title">讲解视频</div>
+        <div v-if="videoUrl" class="video-container">
+          <video :src="videoUrl" controls class="tutorial-video"></video>
+        </div>
+        <div v-else class="video-loading">
+          <el-skeleton animated :rows="3" />
+        </div>
+      </div>
+
       <div class="question-content">
         <div class="section-title">
           题目答案
@@ -157,6 +168,7 @@
 import { ref, reactive, onMounted, watch } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import noteApi from '@/api/note'
+import { request } from '@/api/index'
 import { ElMessage } from 'element-plus'
 import { View, Star, Coin, Comment, ArrowRight, ArrowLeft } from '@element-plus/icons-vue'
 import { MdPreview } from 'md-editor-v3'
@@ -174,6 +186,7 @@ const tagId = ref(route.query.tagId)
 const nextQuestionId = ref(null)
 const prevQuestionId = ref(null)
 const questions = ref([])
+const videoUrl = ref('') // 存储视频播放URL
 
 // 难度等级颜色
 const difficultyColors = ['#99A9BF', '#F7BA2A', '#FF9900', '#FA6400', '#FF0000']
@@ -219,13 +232,38 @@ const toggleAnswer = () => {
   showAnswer.value = !showAnswer.value
 }
 
+// 获取视频URL
+const fetchVideoUrl = async (objectName) => {
+  if (!objectName) return
+  
+  try {
+    const url = await request.get('/file/getReviewUrl', {
+      params: { objectName }
+    })
+    
+    if (url) {
+      videoUrl.value = url
+    } else {
+      console.error('获取视频URL失败，返回为空')
+    }
+  } catch (error) {
+    console.error('获取视频URL失败:', error)
+  }
+}
+
 // 获取题目详情
 const fetchQuestionDetail = async () => {
   loading.value = true
+  videoUrl.value = '' // 重置视频URL
   
   try {
     const data = await noteApi.getQuestionDetail(id.value)
     question.value = data
+    
+    // 如果有视频，获取视频URL
+    if (data && data.video) {
+      fetchVideoUrl(data.video)
+    }
     
     // 获取上一题和下一题的ID
     if (tagId.value) {
@@ -380,6 +418,32 @@ onMounted(() => {
 
 .rating {
   font-size: 14px;
+}
+
+.video-section {
+  padding: 20px;
+  border-bottom: 1px solid #ebeef5;
+}
+
+.video-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 16px;
+}
+
+.tutorial-video {
+  width: 100%;
+  max-width: 720px;
+  height: auto;
+  border-radius: 8px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+}
+
+.video-loading {
+  padding: 40px 0;
+  text-align: center;
+  max-width: 720px;
+  margin: 0 auto;
 }
 
 .question-content {

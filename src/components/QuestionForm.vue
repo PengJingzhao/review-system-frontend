@@ -102,6 +102,7 @@
 import { ref, reactive, onMounted, computed } from 'vue'
 import { ElMessage } from 'element-plus'
 import noteApi from '@/api/note'
+import { request } from '@/api/index'
 import {MdEditor} from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
 import { Upload, Delete } from '@element-plus/icons-vue'
@@ -135,7 +136,8 @@ const questionForm = reactive({
   appearRate: 0.5,
   difficulty: 3,
   tagIds: [], // 存储标签ID
-  videoUrl: '' // 存储视频URL
+  videoUrl: '', // 存储视频URL用于预览
+  video: '' // 存储返回的OSS文件名
 })
 
 // 表单验证规则
@@ -184,15 +186,34 @@ const beforeVideoUpload = (file) => {
 }
 
 // 视频上传成功处理
-const handleVideoSuccess = (response, file) => {
+const handleVideoSuccess = async (response, file) => {
   videoUploading.value = false
   
   if (response) {
-    videoUrl.value = response
-    questionForm.videoUrl = response
-    ElMessage.success('视频上传成功')
+    // 保存返回的OSS文件名
+    const objectName = response
+    
+    try {
+      // 请求获取真实视频URL的接口
+      const videoUrlResponse = await request.get('/file/getReviewUrl', {
+        params: { objectName }
+      })
+      
+      if (videoUrlResponse) {
+        // 设置真实的视频URL
+        videoUrl.value = videoUrlResponse
+        // 同时保存文件名，用于提交表单
+        questionForm.video = objectName
+        ElMessage.success('视频上传成功')
+      } else {
+        ElMessage.error('获取视频链接失败')
+      }
+    } catch (error) {
+      console.error('获取视频链接失败:', error)
+      ElMessage.error('获取视频链接失败，请重试')
+    }
   } else {
-    ElMessage.error('上传失败，未能获取视频URL')
+    ElMessage.error('上传失败，未能获取视频文件名')
   }
 }
 
@@ -211,6 +232,7 @@ const handleVideoProgress = () => {
 const removeVideo = () => {
   videoUrl.value = ''
   questionForm.videoUrl = ''
+  questionForm.video = ''
   videoFileList.value = []
   ElMessage.success('视频已删除')
 }
@@ -245,9 +267,9 @@ const submitForm = async () => {
     // 准备提交数据
     const data = {
       ...questionForm,
-      // 确保提交的是标签ID列表和视频URL
+      // 确保提交的是标签ID列表和视频文件名（而不是URL）
       tagIds: questionForm.tagIds,
-      videoUrl: questionForm.videoUrl
+      video: questionForm.video || ''
     }
     
     // 调用API创建题目
@@ -269,6 +291,7 @@ const resetForm = () => {
   }
   videoUrl.value = ''
   questionForm.videoUrl = ''
+  questionForm.video = ''
   videoFileList.value = []
 }
 
