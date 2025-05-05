@@ -250,6 +250,15 @@ const noteApi = {
     } catch (error) {
       throw error
     }
+  },
+  
+  // 获取推荐题目列表
+  getRecommendQuestions: async () => {
+    try {
+      return await request.get('/recommend/questions')
+    } catch (error) {
+      throw error
+    }
   }
 }
 

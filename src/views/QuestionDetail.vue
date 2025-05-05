@@ -1,162 +1,182 @@
 <template>
   <div class="question-detail" v-loading="loading">
-    <div v-if="!loading && question" class="question-container">
-      <!-- 导航按钮 -->
-      <div class="navigation-buttons">
-        <el-button 
-          type="primary" 
-          plain 
-          :disabled="!prevQuestionId" 
-          @click="navigateToQuestion(prevQuestionId)"
-        >
-          <el-icon><ArrowLeft /></el-icon> 上一题
-        </el-button>
-        
-        <el-button 
-          type="primary" 
-          @click="backToList"
-        >
-          返回列表
-        </el-button>
-        
-        <el-button 
-          type="primary" 
-          plain 
-          :disabled="!nextQuestionId" 
-          @click="navigateToQuestion(nextQuestionId)"
-        >
-          下一题 <el-icon><ArrowRight /></el-icon>
-        </el-button>
-      </div>
-
-      <div class="question-header">
-        <h2 class="title">{{ question.title }}</h2>
-        <div class="meta">
-          <div class="tags">
-            <el-tag
-              v-for="tag in question.tags"
-              :key="tag"
-              size="small"
-              type="success"
-              class="tag"
-            >{{ tag }}</el-tag>
-          </div>
-          <div class="info">
-            <span class="difficulty">
-              <el-tooltip content="难度等级">
-                <el-rate 
-                  v-model="question.difficulty" 
-                  disabled 
-                  :colors="difficultyColors"
-                  class="rating"
-                ></el-rate>
-              </el-tooltip>
-            </span>
-            <span class="appear-rate">出现频率: {{ formatRate(question.appearRate) }}</span>
-            <span class="source">来源: {{ question.source }}</span>
-            <span class="create-time">发布时间: {{ formatDate(question.createTime) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 讲解视频 -->
-      <div v-if="question.video" class="video-section">
-        <div class="section-title">讲解视频</div>
-        <div v-if="videoUrl" class="video-container">
-          <video :src="videoUrl" controls class="tutorial-video"></video>
-        </div>
-        <div v-else class="video-loading">
-          <el-skeleton animated :rows="3" />
-        </div>
-      </div>
-
-      <div class="question-content">
-        <div class="section-title">
-          题目答案
-          <el-button
-            size="small"
-            type="primary"
-            @click="toggleAnswer"
-            class="toggle-btn"
-          >
-            {{ showAnswer ? '隐藏答案' : '查看答案' }}
-          </el-button>
-        </div>
-        <div v-if="showAnswer" class="answer">
-          <MdPreview :modelValue="question.answer" :theme="previewTheme" codeTheme="atom" />
-        </div>
-        <div v-else class="answer-hidden">
-          <el-empty description="答案已隐藏，点击上方按钮查看" :image-size="80"></el-empty>
-        </div>
-      </div>
-
-      <!-- 题目导航 -->
-      <div class="question-navigation" v-if="questions.length > 0">
-        <div class="section-title">题目导航</div>
-        <div class="question-list">
-          <el-scrollbar height="200px">
-            <div 
-              v-for="(q, index) in questions" 
-              :key="q.id" 
-              class="question-nav-item" 
-              :class="{ active: q.id === parseInt(id) }"
-              @click="navigateToQuestion(q.id)"
+    <div v-if="!loading && question" class="content-wrapper">
+      <!-- 左侧主内容区 -->
+      <div class="main-content">
+        <div class="question-container">
+          <!-- 导航按钮 -->
+          <div class="navigation-buttons">
+            <el-button 
+              type="primary" 
+              plain 
+              :disabled="!prevQuestionId" 
+              @click="navigateToQuestion(prevQuestionId)"
             >
-              <span class="question-index">{{ index + 1 }}</span>
-              <span class="question-title-nav">{{ q.title }}</span>
-            </div>
-          </el-scrollbar>
-        </div>
-      </div>
+              <el-icon><ArrowLeft /></el-icon> 上一题
+            </el-button>
+            
+            <el-button 
+              type="primary" 
+              @click="backToList"
+            >
+              返回列表
+            </el-button>
+            
+            <el-button 
+              type="primary" 
+              plain 
+              :disabled="!nextQuestionId" 
+              @click="navigateToQuestion(nextQuestionId)"
+            >
+              下一题 <el-icon><ArrowRight /></el-icon>
+            </el-button>
+          </div>
 
-      <div class="stats">
-        <div class="stat-item">
-          <el-tooltip content="浏览次数" placement="top">
-            <el-icon><View /></el-icon>
-          </el-tooltip>
-          <span>{{ question.viewCount }}</span>
-        </div>
-        <div class="stat-item">
-          <el-tooltip content="收藏数" placement="top">
-            <el-icon><Star /></el-icon>
-          </el-tooltip>
-          <span>{{ question.favoriteCount }}</span>
-        </div>
-        <div class="stat-item">
-          <el-tooltip content="点赞数" placement="top">
-            <el-icon><Coin /></el-icon>
-          </el-tooltip>
-          <span>{{ question.likeCount }}</span>
-        </div>
-        <div class="stat-item">
-          <el-tooltip content="评论数" placement="top">
-            <el-icon><Comment /></el-icon>
-          </el-tooltip>
-          <span>{{ question.commentCount }}</span>
-        </div>
-      </div>
-
-      <div class="comments">
-        <div class="section-title">评论 ({{ question.commentCount }})</div>
-        <div v-if="question.comments && question.comments.length > 0" class="comment-list">
-          <div v-for="comment in question.comments" :key="comment.id" class="comment-item">
-            <div class="comment-header">
-              <span class="user-id">用户 {{ comment.userId }}</span>
-              <span class="time">{{ formatDate(comment.createTime) }}</span>
+          <div class="question-header">
+            <h2 class="title">{{ question.title }}</h2>
+            <div class="meta">
+              <div class="tags">
+                <el-tag
+                  v-for="tag in question.tags"
+                  :key="tag"
+                  size="small"
+                  type="success"
+                  class="tag"
+                >{{ tag }}</el-tag>
+              </div>
+              <div class="info">
+                <span class="difficulty">
+                  <el-tooltip content="难度等级">
+                    <el-rate 
+                      v-model="question.difficulty" 
+                      disabled 
+                      :colors="difficultyColors"
+                      class="rating"
+                    ></el-rate>
+                  </el-tooltip>
+                </span>
+                <span class="appear-rate">出现频率: {{ formatRate(question.appearRate) }}</span>
+                <span class="source">来源: {{ question.source }}</span>
+                <span class="create-time">发布时间: {{ formatDate(question.createTime) }}</span>
+              </div>
             </div>
-            <div class="comment-content">{{ comment.content }}</div>
+          </div>
+
+          <!-- 讲解视频 -->
+          <div v-if="question.video" class="video-section">
+            <div class="section-title">讲解视频</div>
+            <div v-if="videoUrl" class="video-container">
+              <video :src="videoUrl" controls class="tutorial-video"></video>
+            </div>
+            <div v-else class="video-loading">
+              <el-skeleton animated :rows="3" />
+            </div>
+          </div>
+
+          <div class="question-content">
+            <div class="section-title">
+              题目答案
+              <el-button
+                size="small"
+                type="primary"
+                @click="toggleAnswer"
+                class="toggle-btn"
+              >
+                {{ showAnswer ? '隐藏答案' : '查看答案' }}
+              </el-button>
+            </div>
+            <div v-if="showAnswer" class="answer">
+              <MdPreview :modelValue="question.answer" :theme="previewTheme" codeTheme="atom" />
+            </div>
+            <div v-else class="answer-hidden">
+              <el-empty description="答案已隐藏，点击上方按钮查看" :image-size="80"></el-empty>
+            </div>
+          </div>
+
+          <div class="stats">
+            <div class="stat-item">
+              <el-tooltip content="浏览次数" placement="top">
+                <el-icon><View /></el-icon>
+              </el-tooltip>
+              <span>{{ question.viewCount }}</span>
+            </div>
+            <div class="stat-item">
+              <el-tooltip content="收藏数" placement="top">
+                <el-icon><Star /></el-icon>
+              </el-tooltip>
+              <span>{{ question.favoriteCount }}</span>
+            </div>
+            <div class="stat-item">
+              <el-tooltip content="点赞数" placement="top">
+                <el-icon><Coin /></el-icon>
+              </el-tooltip>
+              <span>{{ question.likeCount }}</span>
+            </div>
+            <div class="stat-item">
+              <el-tooltip content="评论数" placement="top">
+                <el-icon><Comment /></el-icon>
+              </el-tooltip>
+              <span>{{ question.commentCount }}</span>
+            </div>
+          </div>
+
+          <div class="comments">
+            <div class="section-title">评论 ({{ question.commentCount }})</div>
+            <div v-if="question.comments && question.comments.length > 0" class="comment-list">
+              <div v-for="comment in question.comments" :key="comment.id" class="comment-item">
+                <div class="comment-header">
+                  <span class="user-id">用户 {{ comment.userId }}</span>
+                  <span class="time">{{ formatDate(comment.createTime) }}</span>
+                </div>
+                <div class="comment-content">{{ comment.content }}</div>
+              </div>
+            </div>
+            <el-empty v-else description="暂无评论"></el-empty>
+
+            <div class="add-comment">
+              <el-input
+                v-model="commentContent"
+                type="textarea"
+                :rows="3"
+                placeholder="添加评论..."
+              ></el-input>
+              <el-button type="primary" @click="submitComment">发布评论</el-button>
+            </div>
           </div>
         </div>
-        <el-empty v-else description="暂无评论"></el-empty>
-
-        <div class="add-comment">
-          <el-input
-            v-model="commentContent"
-            type="textarea"
-            :rows="3"
-            placeholder="添加评论..."
-          ></el-input>
-          <el-button type="primary" @click="submitComment">发布评论</el-button>
+      </div>
+      
+      <!-- 右侧边栏 -->
+      <div class="sidebar">
+        <!-- 题目导航 -->
+        <div class="sidebar-panel" v-if="questions.length > 0">
+          <div class="panel">
+            <div class="panel-header">
+              <span class="panel-title">题目导航</span>
+            </div>
+            <div class="panel-body">
+              <el-scrollbar height="300px">
+                <div 
+                  v-for="(q, index) in questions" 
+                  :key="q.id" 
+                  class="question-nav-item" 
+                  :class="{ active: q.id === parseInt(id) }"
+                  @click="navigateToQuestion(q.id)"
+                >
+                  <span class="question-index">{{ index + 1 }}</span>
+                  <span class="question-title-nav">{{ q.title }}</span>
+                </div>
+              </el-scrollbar>
+            </div>
+          </div>
+        </div>
+        
+        <!-- 推荐题目列表 -->
+        <div class="sidebar-panel">
+          <RecommendQuestions 
+            @questionClick="handleRecommendClick"
+            :tagId="tagId"
+          />
         </div>
       </div>
     </div>
@@ -173,6 +193,7 @@ import { ElMessage } from 'element-plus'
 import { View, Star, Coin, Comment, ArrowRight, ArrowLeft } from '@element-plus/icons-vue'
 import { MdPreview } from 'md-editor-v3'
 import 'md-editor-v3/lib/style.css'
+import RecommendQuestions from '@/components/RecommendQuestions.vue'
 
 const route = useRoute()
 const router = useRouter()
@@ -353,6 +374,14 @@ const submitComment = async () => {
   }
 }
 
+// 处理推荐题目点击
+const handleRecommendClick = (questionId) => {
+  router.push({
+    path: `/question/${questionId}`,
+    query: { tagId: tagId.value }
+  })
+}
+
 // 页面加载时获取数据
 onMounted(() => {
   fetchQuestionDetail()
@@ -364,9 +393,30 @@ onMounted(() => {
 
 <style scoped>
 .question-detail {
-  max-width: 900px;
-  margin: 0 auto;
   padding: 20px;
+}
+
+/* 主体两栏布局 */
+.content-wrapper {
+  display: flex;
+  gap: 20px;
+}
+
+.main-content {
+  flex: 1;
+  padding-top: 0;
+}
+
+.sidebar {
+  width: 300px;
+  flex-shrink: 0;
+  position: sticky;
+  top: 20px;
+  align-self: flex-start;
+}
+
+.sidebar-panel {
+  margin-bottom: 20px;
 }
 
 .question-container {
@@ -374,6 +424,34 @@ onMounted(() => {
   border-radius: 8px;
   box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
   overflow: hidden;
+}
+
+/* 统一面板样式 */
+.panel {
+  background-color: #fff;
+  border-radius: 4px;
+  box-shadow: 0 2px 12px 0 rgba(0, 0, 0, 0.1);
+  overflow: hidden;
+}
+
+.panel-header {
+  height: 56px;
+  padding: 0 15px;
+  background-color: #fff;
+  border-bottom: 1px solid #ebeef5;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.panel-title {
+  font-size: 16px;
+  color: #303133;
+  font-weight: 500;
+}
+
+.panel-body {
+  padding: 15px;
 }
 
 .navigation-buttons {
@@ -474,16 +552,6 @@ onMounted(() => {
   text-align: center;
 }
 
-.question-navigation {
-  padding: 20px;
-  border-bottom: 1px solid #ebeef5;
-}
-
-.question-list {
-  background-color: #f5f7fa;
-  border-radius: 4px;
-}
-
 .question-nav-item {
   padding: 10px 16px;
   cursor: pointer;
@@ -491,6 +559,10 @@ onMounted(() => {
   align-items: center;
   transition: background-color 0.3s;
   border-bottom: 1px solid #ebeef5;
+}
+
+.question-nav-item:last-child {
+  border-bottom: none;
 }
 
 .question-nav-item:hover {
@@ -573,5 +645,24 @@ onMounted(() => {
 
 .add-comment .el-button {
   margin-top: 12px;
+}
+
+/* 添加底部填充，防止滚动时内容被裁剪 */
+.el-scrollbar__view::after {
+  content: "";
+  height: 8px;
+  display: block;
+}
+
+/* 响应式布局 */
+@media (max-width: 768px) {
+  .content-wrapper {
+    flex-direction: column;
+  }
+  
+  .sidebar {
+    width: 100%;
+    margin-top: 20px;
+  }
 }
 </style> 
